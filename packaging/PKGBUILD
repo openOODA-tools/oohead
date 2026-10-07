@@ -1,0 +1,21 @@
+# Maintainer: openOODA-tools <ops@openooda.org>
+pkgname=oohead-bin
+_pkgname=oohead
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Zero-copy prefix line and byte extractor with early pipe closure semantics."
+arch=('x86_64')
+url="https://github.com/openOODA-tools/oohead"
+license=('Apache-2.0')
+depends=('glibc')
+provides=('oohead')
+conflicts=('oohead')
+source_x86_64=("${url}/releases/download/v${pkgver}/oohead-linux-x86_64"
+               "uninstall.sh::https://raw.githubusercontent.com/openOODA-tools/${_pkgname}/v${pkgver}/uninstall.sh")
+sha256sums_x86_64=('SKIP'
+                   'SKIP')
+
+package() {
+    install -Dm755 "${srcdir}/oohead-linux-x86_64" "${pkgdir}/usr/bin/oohead"
+    install -Dm755 uninstall.sh "${pkgdir}/usr/bin/oohead-uninstall"
+}
