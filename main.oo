@@ -1,52 +1,100 @@
-// # oohead Main Entry Point
+// # oohead Main Entry Point - Sovereign Prefix Line and Byte Slicer
 //
-// Logline: Zero-copy prefix line and byte extractor with early pipe closure semantics.
+// Logline: Capability-bounded prefix stream slicer with zero ambient authority.
 //
-// Setup: Demands explicit capability tokens and standard argument list.
+// Setup: Demands FsReadCap, ProcessCap, EnvCap tokens without ambient privileges.
 //
 // Beats:
-//   1. Parse command-line options and dispatch --help, --version, or --mcp.
-//   2. Execute capability-bounded oohead operations.
-//   3. Format and output structured results to standard output.
+//   1. Dispatch early execution modes (--help, --version, --test, --demo, --mcp).
+//   2. Determine header banner rules across multi-file target streams.
+//   3. Ingest files under FsReadCap and extract configured prefix slices.
+//   4. Emit formatted text payloads or structured JSON Lines representations.
 
-fn render_help() -> String {
-    return "oohead 0.1.0 (openOODA sovereign search & inspection)\n"
-        + "usage: oohead [options] [ARGUMENTS]...\n\n"
-        + "Zero-copy prefix line and byte extractor with early pipe closure semantics.\n\n"
-        + "Options:\n"
-        + "  -h, --help           display this help and exit\n"
-        + "  -v, --version        output version information and exit\n"
-        + "      --json           output formatted as JSON Lines\n"
-        + "      --color <WHEN>   colorize output: auto, always, never [default: auto]\n"
-        + "      --theme <NAME>   override active oote palette\n"
-        + "      --mcp            run as Model Context Protocol stdio server\n";
-}
+import "core/head_types.oo";
+import "core/prefix_slice.oo";
+import "core/file_reader.oo";
+import "render/render_header.oo";
+import "render/render_json.oo";
+import "render/render_demo.oo";
+import "ipc/cli_options.oo";
+import "ipc/mcp_server.oo";
+import "anchor.oo";
 
-fn render_version() -> String {
-    return "oohead 0.1.0 (openOODA sovereign search & inspection)\n";
-}
+pub fn main(
+    fs: &FsReadCap,
+    _proc_cap: &ProcessCap,
+    _env: &EnvCap,
+    args: List[String]
+) -> Result[Int, String] {
+    let opts: CliParsedOptions = parse_cli_args(args);
 
-fn main(args: List[String]) -> Int {
-    let num_args: Int = list_len(args);
+    if opts.show_help {
+        print(render_cli_help());
+        return Ok(0);
+    }
+    if opts.show_version {
+        println("oohead 0.2.0 (openOODA sovereign prefix line & byte slicer)");
+        return Ok(0);
+    }
+    if opts.test_mode {
+        if verify_all() {
+            println("OK: all tests passed");
+            return Ok(0);
+        }
+        println("FAIL: verification error");
+        return Ok(1);
+    }
+    if opts.demo_mode {
+        print(run_head_demo(!opts.no_color));
+        return Ok(0);
+    }
+    if opts.mcp_mode {
+        run_mcp_server(fs);
+        return Ok(0);
+    }
+
+    let files_cnt: Int = list_len(opts.files);
+    let color: Bool = !opts.no_color;
+    let render_headers: Bool = should_render_header(files_cnt, opts.quiet, opts.verbose);
+    let cfg: HeadConfig = opts_to_head_config(opts);
+
+    if files_cnt == 0 {
+        let sample_stdin: String = "";
+        let res: HeadResult = if cfg.is_bytes_mode {
+            slice_bytes("standard input", sample_stdin, cfg.bytes_count, cfg.is_negative)
+        } else {
+            slice_lines("standard input", sample_stdin, cfg.lines_count, cfg.is_negative, cfg.zero_delim)
+        };
+        if opts.json_mode {
+            println(head_result_to_json(res));
+        } else {
+            print(res.content);
+        }
+        return Ok(0);
+    }
+
     let mut i: Int = 0;
-
-    while i < num_args {
-        let arg: String = list_get(args, i);
-        if arg == "-h" || arg == "--help" {
-            print(render_help());
-            return 0;
-        }
-        if arg == "-v" || arg == "--version" {
-            print(render_version());
-            return 0;
-        }
-        if arg == "--mcp" {
-            print("{\"jsonrpc\":\"2.0\",\"result\":{\"status\":\"ready\",\"tool\":\"oohead\"}}\n");
-            return 0;
+    let mut exit_code: Int = 0;
+    while i < files_cnt {
+        let path: String = list_get(opts.files, i);
+        let f_res: Result[HeadResult, String] = read_file_head(fs, path, cfg);
+        if !f_res.is_ok() {
+            let err_msg: String = match f_res { Ok(_) => "", Err(e) => e };
+            println("oohead: " + err_msg);
+            exit_code = 1;
+        } else {
+            let res: HeadResult = match f_res { Ok(r) => r, Err(_) => make_head_result(path, "", 0, 0, false) };
+            if opts.json_mode {
+                println(head_result_to_json(res));
+            } else {
+                if render_headers {
+                    print(format_file_header(path, i == 0, color));
+                }
+                print(res.content);
+            }
         }
         i = i + 1;
     }
 
-    print("oohead: sovereign capability-bounded utility ready\n");
-    return 0;
+    return Ok(exit_code);
 }

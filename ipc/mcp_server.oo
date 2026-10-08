@@ -1,0 +1,127 @@
+// # Model Context Protocol (MCP) Stdio Server for oohead
+//
+// Logline: Streaming JSON-RPC 2.0 stdio server providing prefix line and byte extraction.
+//
+// Setup: Demands FsReadCap for file inspection and stdio streaming without ambient authority.
+//
+// Beats:
+//   1. Process incoming JSON-RPC 2.0 requests over standard input.
+//   2. Dispatch initialize, tools/list, and tools/call methods.
+//   3. Implement head_lines, head_bytes, head_file, head_sample, and head_demo tools.
+//   4. Emit capability-bounded JSON-RPC responses for AI agents.
+
+import "core/head_types.oo";
+import "core/prefix_slice.oo";
+import "core/file_reader.oo";
+import "render/render_json.oo";
+import "render/render_demo.oo";
+import "ipc/json_field.oo";
+import "ipc/cli_options.oo";
+
+pub fn run_mcp_server(fs: &FsReadCap) {
+    let mut running: Bool = true;
+    while running {
+        let line_res: Result[String, String] = oo_read_stdin_chunk(fs, 8192);
+        if !line_res.is_ok() {
+            running = false;
+        } else {
+            let line: String = match line_res { Ok(s) => s, Err(_) => "" };
+            let trimmed: String = str_trim(line);
+            if chars_len(trimmed) == 0 {
+                running = false;
+            } else {
+                let id: String = json_get_field(trimmed, "id");
+                let method: String = json_get_string(trimmed, "method");
+
+                if method == "initialize" {
+                    let resp: String = "{\"jsonrpc\":\"2.0\",\"id\":" + id +
+                        ",\"result\":{\"protocolVersion\":\"2024-11-05\"," +
+                        "\"serverInfo\":{\"name\":\"oohead\",\"version\":\"0.2.0\"}," +
+                        "\"capabilities\":{\"tools\":{}}}}";
+                    println(resp);
+                } else if method == "notifications/initialized" {
+                    // ack
+                } else if method == "tools/list" {
+                    let t1: String = "{\"name\":\"head_lines\",\"description\":\"Extract first N lines from text\"," +
+                        "\"inputSchema\":{\"type\":\"object\",\"properties\":{\"text\":{\"type\":\"string\"},\"lines\":{\"type\":\"integer\"}},\"required\":[\"text\"]}}";
+                    let t2: String = "{\"name\":\"head_bytes\",\"description\":\"Extract first N bytes from text\"," +
+                        "\"inputSchema\":{\"type\":\"object\",\"properties\":{\"text\":{\"type\":\"string\"},\"bytes\":{\"type\":\"integer\"}},\"required\":[\"text\"]}}";
+                    let t3: String = "{\"name\":\"head_file\",\"description\":\"Read leading lines or bytes from local file under FsReadCap\"," +
+                        "\"inputSchema\":{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"lines\":{\"type\":\"integer\"},\"bytes\":{\"type\":\"integer\"}},\"required\":[\"path\"]}}";
+                    let t4: String = "{\"name\":\"head_sample\",\"description\":\"Extract preview sample with line/byte telemetry metrics\"," +
+                        "\"inputSchema\":{\"type\":\"object\",\"properties\":{\"text\":{\"type\":\"string\"},\"max_lines\":{\"type\":\"integer\"}},\"required\":[\"text\"]}}";
+                    let t5: String = "{\"name\":\"head_demo\",\"description\":\"Run interactive prefix slicing showcase\"," +
+                        "\"inputSchema\":{\"type\":\"object\",\"properties\":{}}}";
+                    let resp: String = "{\"jsonrpc\":\"2.0\",\"id\":" + id +
+                        ",\"result\":{\"tools\":[" + t1 + "," + t2 + "," + t3 + "," + t4 + "," + t5 + "]}}";
+                    println(resp);
+                } else if method == "tools/call" {
+                    let params: String = json_get_field(trimmed, "params");
+                    let tool_name: String = json_get_string(params, "name");
+                    let args: String = json_get_field(params, "arguments");
+
+                    if tool_name == "head_lines" {
+                        let text: String = json_get_string(args, "text");
+                        let lines_str: String = json_get_string(args, "lines");
+                        let lines_cnt: Int = if chars_len(lines_str) > 0 { parse_int_val(lines_str) } else { 10 };
+                        let res: HeadResult = slice_lines("input", text, lines_cnt, false, false);
+                        let j: String = head_result_to_json(res);
+                        let resp: String = "{\"jsonrpc\":\"2.0\",\"id\":" + id +
+                            ",\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"" + json_escape(j) + "\"}]}}";
+                        println(resp);
+                    } else if tool_name == "head_bytes" {
+                        let text: String = json_get_string(args, "text");
+                        let bytes_str: String = json_get_string(args, "bytes");
+                        let bytes_cnt: Int = if chars_len(bytes_str) > 0 { parse_int_val(bytes_str) } else { 64 };
+                        let res: HeadResult = slice_bytes("input", text, bytes_cnt, false);
+                        let j: String = head_result_to_json(res);
+                        let resp: String = "{\"jsonrpc\":\"2.0\",\"id\":" + id +
+                            ",\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"" + json_escape(j) + "\"}]}}";
+                        println(resp);
+                    } else if tool_name == "head_file" {
+                        let path: String = json_get_string(args, "path");
+                        let lines_str: String = json_get_string(args, "lines");
+                        let bytes_str: String = json_get_string(args, "bytes");
+                        let mut cfg: HeadConfig = default_head_config();
+                        if chars_len(bytes_str) > 0 {
+                            cfg.is_bytes_mode = true;
+                            cfg.bytes_count = parse_int_val(bytes_str);
+                        } else if chars_len(lines_str) > 0 {
+                            cfg.lines_count = parse_int_val(lines_str);
+                        }
+                        let f_res: Result[HeadResult, String] = read_file_head(fs, path, cfg);
+                        let j: String = match f_res {
+                            Ok(res) => head_result_to_json(res),
+                            Err(e) => "{\"error\":\"" + json_escape(e) + "\"}"
+                        };
+                        let resp: String = "{\"jsonrpc\":\"2.0\",\"id\":" + id +
+                            ",\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"" + json_escape(j) + "\"}]}}";
+                        println(resp);
+                    } else if tool_name == "head_sample" {
+                        let text: String = json_get_string(args, "text");
+                        let max_str: String = json_get_string(args, "max_lines");
+                        let max_l: Int = if chars_len(max_str) > 0 { parse_int_val(max_str) } else { 5 };
+                        let res: HeadResult = slice_lines("sample", text, max_l, false, false);
+                        let j: String = head_result_to_json(res);
+                        let resp: String = "{\"jsonrpc\":\"2.0\",\"id\":" + id +
+                            ",\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"" + json_escape(j) + "\"}]}}";
+                        println(resp);
+                    } else if tool_name == "head_demo" {
+                        let demo_out: String = run_head_demo(false);
+                        let resp: String = "{\"jsonrpc\":\"2.0\",\"id\":" + id +
+                            ",\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"" + json_escape(demo_out) + "\"}]}}";
+                        println(resp);
+                    } else {
+                        let resp: String = "{\"jsonrpc\":\"2.0\",\"id\":" + id +
+                            ",\"error\":{\"code\":-32601,\"message\":\"Method not found\"}}";
+                        println(resp);
+                    }
+                } else {
+                    let resp: String = "{\"jsonrpc\":\"2.0\",\"id\":" + id +
+                        ",\"error\":{\"code\":-32601,\"message\":\"Method not found\"}}";
+                    println(resp);
+                }
+            }
+        }
+    }
+}

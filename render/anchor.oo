@@ -1,0 +1,46 @@
+// # Render Subsystem Verification Anchor
+//
+// Logline: Automated self-tests for file header formatting and JSON serialization.
+//
+// Setup: Validates output generation across banner formatting and JSON serialization.
+//
+// Beats:
+//   1. Verify should_render_header decision logic across quiet and verbose flags.
+//   2. Verify POSIX file banner header text generation.
+//   3. Verify RFC 8259 JSON serialization of HeadResult structures.
+//   4. Verify interactive showcase demo output text.
+
+import "core/head_types.oo";
+import "render/render_header.oo";
+import "render/render_json.oo";
+import "render/render_demo.oo";
+
+pub fn verify_render() -> Bool {
+    if !should_render_header(2, false, false) {
+        return false;
+    }
+    if should_render_header(2, true, false) {
+        return false;
+    }
+    if !should_render_header(1, false, true) {
+        return false;
+    }
+
+    let hdr: String = format_file_header("test.txt", true, false);
+    if hdr != "==> test.txt <==\n" {
+        return false;
+    }
+
+    let res: HeadResult = make_head_result("test.txt", "hello\n", 1, 6, true);
+    let json: String = head_result_to_json(res);
+    if chars_len(json) < 20 {
+        return false;
+    }
+
+    let demo: String = run_head_demo(false);
+    if chars_len(demo) < 50 {
+        return false;
+    }
+
+    return true;
+}

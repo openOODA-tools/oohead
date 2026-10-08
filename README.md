@@ -54,47 +54,51 @@ oohead-uninstall
 ## 2. CLI Usage
 
 ```
-usage: oohead [options] [ARGUMENTS]...
+usage: oohead [options] [FILE]...
 
 Zero-copy prefix line and byte extractor with early pipe closure semantics.
 
 Options:
-  -h, --help           display this help and exit
-  -v, --version        output version information and exit
-      --json           output formatted as JSON Lines
-      --color <WHEN>   colorize output: auto, always, never [default: auto]
-      --theme <NAME>   override active oote palette
-      --mcp            run as Model Context Protocol stdio server
+  -n, --lines <[-]NUM>  print first NUM lines (or all except last NUM if negative) [default: 10]
+  -c, --bytes <[-]NUM>  print first NUM bytes (or all except last NUM if negative)
+  -q, --quiet, --silent never print file name headers
+  -v, --verbose         always print file name headers
+  -z, --zero-terminated line delimiter is NUL byte, not newline
+      --json            output structured JSON with line and byte telemetry
+  -D, --demo            run interactive prefix slicer demonstration showcase
+      --test            run internal self-verification suite
+  -h, --help            display this help and exit
+  -V, --version         output version information and exit
+      --mcp             run as Model Context Protocol stdio server
 ```
 
 ---
 
-## 3. Theming Integration (`oote`)
+## 3. Model Context Protocol (MCP)
 
-`oohead` synchronizes visual styles and status colors with [oote](https://github.com/openOODA-tools/oote):
-* **Configuration:** Reads active palette from `~/.openooda/theme.oot`.
-* **Environment Overrides:** Respects `$OODA_THEME` and `$NO_COLOR`.
-
----
-
-## 4. Model Context Protocol (MCP)
-
-When invoked with `--mcp`, `oohead` runs a JSON-RPC 2.0 stdio server providing structured tools for AI coding agents:
+When invoked with `--mcp`, `oohead` runs a JSON-RPC 2.0 stdio server providing capability-bounded prefix slicing tools for AI coding agents:
 
 ```bash
 oohead --mcp
 ```
 
+### Supported Tools
+1. `head_lines` - Extract leading lines from raw text payload with early break detection.
+2. `head_bytes` - Extract leading byte slice from text payload.
+3. `head_file` - Inspect leading lines or bytes of a local file under `&FsReadCap`.
+4. `head_sample` - Extract preview sample with line/byte telemetry metrics.
+5. `head_demo` - Run interactive prefix slicing showcase.
+
 ---
 
-## 5. Security & Zero Ambient Authority
+## 4. Security & Zero Ambient Authority
 
-* **Pure Capability Bounded:** Operates strictly with explicit tokens (&FsReadCap, &TermCap, &McpCap). Physical absence of ambient disk/net leakage.
+* **Pure Capability Bounded:** Operates strictly with explicit tokens (`&FsReadCap`, `&ProcessCap`, `&EnvCap`). Physical absence of ambient disk/net leakage.
 * **Negative-Trust Architecture:** Strict input validation and operational limits.
 * **Hermetic Binary:** Standalone zero-dependency executable.
 
 ---
 
-## 6. License
+## 5. License
 
 Apache License, Version 2.0. See [LICENSE](LICENSE) for details.

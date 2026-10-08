@@ -1,0 +1,63 @@
+// # Core Subsystem Verification Anchor
+//
+// Logline: Automated self-tests for prefix line and byte slicing algorithms.
+//
+// Setup: Exercises line slicing, byte slicing, negative bounds, and delimiter handling.
+//
+// Beats:
+//   1. Verify leading line count extraction on multi-line text payloads.
+//   2. Verify negative line count extraction omitting trailing records.
+//   3. Verify raw byte count prefix slicing.
+//   4. Verify early break detection and delimiter handling.
+
+import "core/head_types.oo";
+import "core/prefix_slice.oo";
+
+pub fn verify_core() -> Bool {
+    let sample: String = "line1\nline2\nline3\nline4\nline5\n";
+
+    // Test 1: extract first 2 lines
+    let r1: HeadResult = slice_lines("sample", sample, 2, false, false);
+    if r1.content != "line1\nline2\n" || r1.lines_extracted != 2 || !r1.early_break {
+        return false;
+    }
+
+    // Test 2: extract all but last 2 lines
+    let r2: HeadResult = slice_lines("sample", sample, 2, true, false);
+    if r2.content != "line1\nline2\nline3\n" || r2.lines_extracted != 3 {
+        return false;
+    }
+
+    // Test 3: extract first 5 bytes ("line1")
+    let r3: HeadResult = slice_bytes("sample", sample, 5, false);
+    if r3.content != "line1" || r3.bytes_extracted != 5 {
+        return false;
+    }
+
+    // Test 4: zero delimiter slicing
+    let mut bz: List[Int] = bytes_new();
+    bz = bytes_push(bz, 97); // 'a'
+    bz = bytes_push(bz, 108); // 'l'
+    bz = bytes_push(bz, 112); // 'p'
+    bz = bytes_push(bz, 104); // 'h'
+    bz = bytes_push(bz, 97); // 'a'
+    bz = bytes_push(bz, 0);   // NUL
+    bz = bytes_push(bz, 98); // 'b'
+    bz = bytes_push(bz, 101); // 'e'
+    bz = bytes_push(bz, 116); // 't'
+    bz = bytes_push(bz, 97); // 'a'
+    bz = bytes_push(bz, 0);   // NUL
+    bz = bytes_push(bz, 103); // 'g'
+    bz = bytes_push(bz, 0);   // NUL
+    let sample_z: String = bytes_to_str(bz);
+
+    let r4: HeadResult = slice_lines("sample_z", sample_z, 2, false, true);
+    if r4.lines_extracted != 2 || r4.bytes_extracted != 11 {
+        return false;
+    }
+    if byte_at(r4.content, 0) != 97 || byte_at(r4.content, 5) != 0 || byte_at(r4.content, 10) != 0 {
+        return false;
+    }
+
+    return true;
+}

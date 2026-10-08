@@ -1,0 +1,39 @@
+// # Prefix Slicing Demonstration Showcase
+//
+// Logline: Interactive demonstration showcasing prefix line and byte stream extraction.
+//
+// Setup: Terminal presentation detailing POSIX prefix slicing and early break metrics.
+//
+// Beats:
+//   1. Display header banner celebrating sovereign openOODA oohead.
+//   2. Demonstrate line count slicing on multi-line text blocks.
+//   3. Demonstrate byte slicing with zero-copy stream bounds.
+//   4. Demonstrate structured JSON telemetry with early break indicators.
+
+import "core/head_types.oo";
+import "core/prefix_slice.oo";
+import "render/render_header.oo";
+import "render/render_json.oo";
+
+pub fn run_head_demo(color: Bool) -> String {
+    let mut out: String = "";
+    out = out + "========================================================\n";
+    out = out + "       openOODA oohead v0.2.0 - Sovereign Prefix Slicer \n";
+    out = out + "========================================================\n\n";
+
+    let sample_text: String = "Alpha line one\nBeta line two\nGamma line three\nDelta line four\nEpsilon line five\n";
+
+    out = out + format_file_header("demo.txt (First 3 Lines)", true, color);
+    let r1: HeadResult = slice_lines("demo.txt", sample_text, 3, false, false);
+    out = out + r1.content;
+
+    out = out + format_file_header("demo.txt (First 18 Bytes)", false, color);
+    let r2: HeadResult = slice_bytes("demo.txt", sample_text, 18, false);
+    out = out + r2.content + "\n";
+
+    out = out + "\n--- Structured JSON Telemetry ---\n";
+    out = out + head_result_to_json(r1) + "\n\n";
+
+    out = out + "Prefix line and byte extraction verified with zero ambient authority.\n";
+    return out;
+}

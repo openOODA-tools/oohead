@@ -1,0 +1,43 @@
+// # IPC Subsystem Verification Anchor
+//
+// Logline: Automated self-tests for CLI argument parsing and JSON payload extraction.
+//
+// Setup: Validates command line flags, integer parsing, and JSON field decoding.
+//
+// Beats:
+//   1. Verify CLI argument parsing for line count flags.
+//   2. Verify CLI argument parsing for byte mode and quiet/verbose options.
+//   3. Verify JSON field parsing for MCP dispatch frames.
+//   4. Verify CLI usage documentation formatting.
+
+import "ipc/json_field.oo";
+import "ipc/cli_options.oo";
+
+pub fn verify_ipc() -> Bool {
+    let mut args: List[String] = list_new();
+    args = list_push(args, "-n");
+    args = list_push(args, "25");
+    args = list_push(args, "-v");
+    args = list_push(args, "test.txt");
+
+    let opts: CliParsedOptions = parse_cli_args(args);
+    if opts.lines_count != 25 || !opts.verbose {
+        return false;
+    }
+    if list_len(opts.files) != 1 || list_get(opts.files, 0) != "test.txt" {
+        return false;
+    }
+
+    let json: String = "{\"method\":\"tools/call\",\"params\":{\"name\":\"head_lines\"}}";
+    let method: String = json_get_string(json, "method");
+    if method != "tools/call" {
+        return false;
+    }
+
+    let help: String = render_cli_help();
+    if chars_len(help) < 50 {
+        return false;
+    }
+
+    return true;
+}

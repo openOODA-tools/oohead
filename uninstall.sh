@@ -4,7 +4,7 @@
 # "Removes oohead binary, package installations, and cache."
 #
 # Usage:
-#   curl -fsSL https://openooda-toohead.github.io/oohead/uninstall.sh | bash
+#   curl -fsSL https://openooda-tools.github.io/oohead/uninstall.sh | bash
 #   or: ./uninstall.sh [options]
 #
 # Options:

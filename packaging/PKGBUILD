@@ -1,7 +1,7 @@
 # Maintainer: openOODA-tools <ops@openooda.org>
 pkgname=oohead-bin
 _pkgname=oohead
-pkgver=0.1.0
+pkgver=0.2.0
 pkgrel=1
 pkgdesc="Zero-copy prefix line and byte extractor with early pipe closure semantics."
 arch=('x86_64')

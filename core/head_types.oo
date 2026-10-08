@@ -1,0 +1,57 @@
+// # Prefix Slicing and Extraction Data Types
+//
+// Logline: Data models representing prefix slicing parameters and extraction results.
+//
+// Setup: Pure data models without external system or library dependencies.
+//
+// Beats:
+//   1. Declare HeadConfig container for slice boundaries and operational modes.
+//   2. Declare HeadResult container for extracted payload and metrics.
+//   3. Provide pure default constructor for slicing configuration.
+//   4. Provide pure constructor for extraction results.
+
+pub type HeadConfig = struct {
+    lines_count: Int,
+    bytes_count: Int,
+    is_bytes_mode: Bool,
+    is_negative: Bool,
+    quiet: Bool,
+    verbose: Bool,
+    zero_delim: Bool
+};
+
+pub type HeadResult = struct {
+    file_name: String,
+    content: String,
+    lines_extracted: Int,
+    bytes_extracted: Int,
+    early_break: Bool
+};
+
+pub fn default_head_config() -> HeadConfig {
+    return HeadConfig {
+        lines_count: 10,
+        bytes_count: 0,
+        is_bytes_mode: false,
+        is_negative: false,
+        quiet: false,
+        verbose: false,
+        zero_delim: false
+    };
+}
+
+pub fn make_head_result(
+    name: String,
+    text: String,
+    lines_cnt: Int,
+    bytes_cnt: Int,
+    early: Bool
+) -> HeadResult {
+    return HeadResult {
+        file_name: name,
+        content: text,
+        lines_extracted: lines_cnt,
+        bytes_extracted: bytes_cnt,
+        early_break: early
+    };
+}

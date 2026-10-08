@@ -1,0 +1,138 @@
+// # Prefix Line and Byte Stream Slicer
+//
+// Logline: Zero-copy slicing routines extracting leading lines and byte sequences.
+//
+// Setup: Pure string manipulation routines with support for NUL and negative bounds.
+//
+// Beats:
+//   1. Segment input streams across newline or NUL delimiters.
+//   2. Slice exact leading line counts with early break termination.
+//   3. Support negative line counts extracting all lines except the tail.
+//   4. Extract raw byte prefixes with early quota satisfaction.
+
+import "core/head_types.oo";
+
+pub fn slice_lines(
+    name: String,
+    text: String,
+    count: Int,
+    is_negative: Bool,
+    zero_delim: Bool
+) -> HeadResult {
+    let delim_byte: Int = if zero_delim { 0 } else { 10 };
+    let n: Int = bytes_len(text);
+    if n == 0 {
+        return make_head_result(name, "", 0, 0, false);
+    }
+
+    if is_negative {
+        let mut total_lines: Int = 0;
+        let mut i: Int = 0;
+        while i < n {
+            if byte_at(text, i) == delim_byte {
+                total_lines = total_lines + 1;
+            }
+            i = i + 1;
+        }
+        let ends_with_delim: Bool = (byte_at(text, n - 1) == delim_byte);
+        if !ends_with_delim {
+            total_lines = total_lines + 1;
+        }
+
+        let keep_lines: Int = if total_lines > count { total_lines - count } else { 0 };
+        if keep_lines <= 0 {
+            return make_head_result(name, "", 0, 0, false);
+        }
+
+        let mut seen: Int = 0;
+        let mut cut_idx: Int = 0;
+        i = 0;
+        while i < n && seen < keep_lines {
+            if byte_at(text, i) == delim_byte {
+                seen = seen + 1;
+                cut_idx = i + 1;
+            }
+            i = i + 1;
+        }
+        if !ends_with_delim && seen < keep_lines {
+            cut_idx = n;
+            seen = seen + 1;
+        }
+
+        let sliced: String = byte_slice(text, 0, cut_idx);
+        let bytes_cnt: Int = bytes_len(sliced);
+        return make_head_result(name, sliced, seen, bytes_cnt, false);
+    }
+
+    if count <= 0 {
+        return make_head_result(name, "", 0, 0, true);
+    }
+
+    let mut lines_seen: Int = 0;
+    let mut i: Int = 0;
+    let mut last_end: Int = 0;
+
+    while i < n && lines_seen < count {
+        let b: Int = byte_at(text, i);
+        if b == delim_byte {
+            lines_seen = lines_seen + 1;
+            last_end = i + 1;
+        }
+        i = i + 1;
+    }
+
+    let mut early: Bool = false;
+    let mut slice_end: Int = i;
+    if lines_seen >= count {
+        early = true;
+        slice_end = last_end;
+    } else {
+        slice_end = n;
+        if n > 0 && last_end < n {
+            lines_seen = lines_seen + 1;
+        }
+    }
+
+    let sliced: String = byte_slice(text, 0, slice_end);
+    let bytes_cnt: Int = bytes_len(sliced);
+    return make_head_result(name, sliced, lines_seen, bytes_cnt, early);
+}
+
+pub fn slice_bytes(
+    name: String,
+    text: String,
+    count: Int,
+    is_negative: Bool
+) -> HeadResult {
+    let total_bytes: Int = bytes_len(text);
+    if total_bytes == 0 {
+        return make_head_result(name, "", 0, 0, false);
+    }
+
+    let mut take_bytes: Int = count;
+    if is_negative {
+        take_bytes = if total_bytes > count { total_bytes - count } else { 0 };
+    } else if take_bytes > total_bytes {
+        take_bytes = total_bytes;
+    }
+
+    if take_bytes <= 0 {
+        return make_head_result(name, "", 0, 0, true);
+    }
+
+    let mut byte_list: List[Int] = bytes_new();
+    let mut i: Int = 0;
+    let mut lines_seen: Int = 0;
+    while i < take_bytes {
+        let b: Int = byte_at(text, i);
+        if b == 10 { // newline
+            lines_seen = lines_seen + 1;
+        }
+        byte_list = bytes_push(byte_list, b);
+        i = i + 1;
+    }
+
+    let sliced: String = bytes_to_str(byte_list);
+    let early: Bool = take_bytes < total_bytes;
+    return make_head_result(name, sliced, lines_seen, take_bytes, early);
+}

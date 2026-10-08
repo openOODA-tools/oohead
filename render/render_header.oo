@@ -1,0 +1,38 @@
+// # File Header and Banner Formatter
+//
+// Logline: Formats POSIX file headers and banners for multi-file prefix inspection.
+//
+// Setup: Terminal styling routines supporting ANSI colors and quiet/verbose rules.
+//
+// Beats:
+//   1. Determine whether banner headers are required under POSIX rules.
+//   2. Render standard POSIX file banners (==> filename <==).
+//   3. Apply ANSI TrueColor/bold sequences when colorization is enabled.
+//   4. Format leading separators between multiple file streams.
+
+fn ansi_bold_cyan(color: Bool) -> String {
+    if !color { return ""; }
+    return "\x1b[1;36m";
+}
+
+fn ansi_reset(color: Bool) -> String {
+    if !color { return ""; }
+    return "\x1b[0m";
+}
+
+pub fn should_render_header(file_count: Int, quiet: Bool, verbose: Bool) -> Bool {
+    if quiet {
+        return false;
+    }
+    if verbose {
+        return true;
+    }
+    return file_count > 1;
+}
+
+pub fn format_file_header(filename: String, is_first: Bool, color: Bool) -> String {
+    let prefix: String = if is_first { "" } else { "\n" };
+    let c: String = ansi_bold_cyan(color);
+    let r: String = ansi_reset(color);
+    return prefix + c + "==> " + filename + " <==" + r + "\n";
+}

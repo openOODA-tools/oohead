@@ -1,0 +1,46 @@
+// # RFC 8259 JSON Serializer for Prefix Extraction
+//
+// Logline: Formats prefix extraction results and telemetry metrics into standard JSON.
+//
+// Setup: String escapers and field formatters producing strict RFC 8259 payloads.
+//
+// Beats:
+//   1. Escape special control characters and quotation marks.
+//   2. Serialize HeadResult record into structured JSON object.
+//   3. Include lines, bytes, and early pipe break telemetry flags.
+//   4. Format JSON Lines representations for continuous stream consumption.
+
+import "core/head_types.oo";
+
+pub fn json_escape_head_str(s: String) -> String {
+    let n: Int = chars_len(s);
+    let mut out: String = "";
+    let mut i: Int = 0;
+    while i < n {
+        let ch: String = char_at(s, i);
+        if ch == "\\" {
+            out = out + "\\\\";
+        } else if ch == "\"" {
+            out = out + "\\\"";
+        } else if ch == "\n" {
+            out = out + "\\n";
+        } else if ch == "\t" {
+            out = out + "\\t";
+        } else if ch == "\r" {
+            out = out + "\\r";
+        } else {
+            out = out + ch;
+        }
+        i = i + 1;
+    }
+    return out;
+}
+
+pub fn head_result_to_json(res: HeadResult) -> String {
+    let early_str: String = if res.early_break { "true" } else { "false" };
+    return "{\"file\":\"" + json_escape_head_str(res.file_name) + "\","
+        + "\"lines\":" + to_string(res.lines_extracted) + ","
+        + "\"bytes\":" + to_string(res.bytes_extracted) + ","
+        + "\"early_break\":" + early_str + ","
+        + "\"content\":\"" + json_escape_head_str(res.content) + "\"}";
+}

@@ -1,0 +1,34 @@
+// # Capability-Bounded File Reader and Prefix Evaluator
+//
+// Logline: Ingests filesystem contents under FsReadCap and extracts configured prefix slices.
+//
+// Setup: Demands explicit FsReadCap token with zero ambient filesystem authority.
+//
+// Beats:
+//   1. Open and read target file contents bounded by capability token.
+//   2. Apply line or byte extraction rules based on HeadConfig parameters.
+//   3. Handle read errors and return structured diagnostic messages.
+//   4. Package extracted content into typed HeadResult records.
+
+import "core/head_types.oo";
+import "core/prefix_slice.oo";
+
+pub fn read_file_head(
+    fs: &FsReadCap,
+    path: String,
+    cfg: HeadConfig
+) -> Result[HeadResult, String] {
+    let r: Result[String, String] = read_file(fs, path);
+    if !r.is_ok() {
+        return Err("cannot open '" + path + "' for reading: No such file or directory");
+    }
+    let content: String = match r { Ok(s) => s, Err(_) => "" };
+
+    if cfg.is_bytes_mode {
+        let res: HeadResult = slice_bytes(path, content, cfg.bytes_count, cfg.is_negative);
+        return Ok(res);
+    }
+
+    let res: HeadResult = slice_lines(path, content, cfg.lines_count, cfg.is_negative, cfg.zero_delim);
+    return Ok(res);
+}
